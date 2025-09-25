@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:patinya888/config/internal_config.dart';
@@ -197,7 +198,7 @@ class _AdminlottoState extends State<Adminlotto> {
                       backgroundColor: Colors.purple,
                     ),
                     onPressed: () async {
-                      final number = await randomAllLotto();
+                      final number = await randomAllLotto(context);
                       if (number != null) {
                         onRandom(number); // ✅ อัปเดต prizeNumber
                         showDialog(
@@ -231,63 +232,59 @@ class _AdminlottoState extends State<Adminlotto> {
 
   // ✅ Card รางวัลเลขท้าย 2 ตัว
   Widget lasttwo(String title, String prizeNumber, Function(String) onRandom) {
-    return Card(
-      color: Colors.black,
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 24),
+  return Card(
+    color: Colors.black,
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 24),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white),
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                prizeNumber.isNotEmpty ? prizeNumber : "ยังไม่มีเลข",
-                style: const TextStyle(color: Colors.white, fontSize: 20),
-              ),
+            child: Text(
+              prizeNumber.isNotEmpty ? prizeNumber : "ยังไม่มีเลข",
+              style: const TextStyle(color: Colors.white, fontSize: 20),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      // ✅ สุ่มเลข 00-99
-                      final rnd =
-                          (100 + (DateTime.now().millisecondsSinceEpoch % 100))
-                              .toString()
-                              .substring(1);
-                      onRandom(rnd);
-                    },
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                    child: const Text(
-                      'สุ่มเลขจาก 00-99',
-                      style: TextStyle(fontSize: 16),
-                    ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    // ✅ สุ่มเลข 00-99 จริง ๆ
+                    final rnd = Random().nextInt(100).toString().padLeft(2, "0");
+                    onRandom(rnd);
+                  },
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    backgroundColor: Colors.blueAccent,
+                  ),
+                  child: const Text(
+                    'สุ่มเลขจาก 00-99',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   // ✅ ส่งผลไป API
   Future<void> saveWinners() async {
     if (firstPrize.isEmpty ||
@@ -336,7 +333,7 @@ class _AdminlottoState extends State<Adminlotto> {
       {"type": "first", "number": firstPrize},
       {"type": "second", "number": secondPrize},
       {"type": "third", "number": thirdPrize},
-      {"type": "lastTwoDigits", "number": lastTwoPrize},
+      {"type": "fifth", "number": lastTwoPrize},
     ];
 
     try {
@@ -420,7 +417,7 @@ class _AdminlottoState extends State<Adminlotto> {
     return null;
   }
 
-  Future<String?> randomAllLotto() async {
+  Future<String?> randomAllLotto(BuildContext context) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
@@ -434,11 +431,19 @@ class _AdminlottoState extends State<Adminlotto> {
         headers: {"Authorization": "Bearer $token"},
       );
 
+      print("Status code: ${res.statusCode}");
+      print("Body: ${res.body}");
+
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final number = data['number'];
-
-        return number; // ✅ ส่งค่ากลับ
+        return number;
+      } else if (res.statusCode == 400) {
+        // ✅ ถ้าไม่มีเลข
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("❌ ไม่มีเลขในระบบ")));
+        return null;
       } else if (res.statusCode == 401) {
         throw Exception("ไม่ได้รับอนุญาต (401)");
       } else {

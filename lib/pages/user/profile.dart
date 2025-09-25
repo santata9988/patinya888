@@ -29,8 +29,10 @@ class _ProfilePage extends State<ProfilePage> {
   Widget build(BuildContext context) {
     log('Customer id: ${widget.userId}');
     return Scaffold(
-      appBar: AppBar(title: const Text('ข้อมูลส่วนตัว'),
-      automaticallyImplyLeading: false,),
+      appBar: AppBar(
+        title: const Text('ข้อมูลส่วนตัว'),
+        automaticallyImplyLeading: false,
+      ),
       body: FutureBuilder<CustomerIdxGetResponse>(
         future: loadData,
         builder: (context, snapshot) {
@@ -60,7 +62,7 @@ class _ProfilePage extends State<ProfilePage> {
                   ),
                   Text(user.name),
                   const SizedBox(height: 16),
-            
+
                   const Text(
                     'หมายเลขโทรศัพท์:',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -68,17 +70,17 @@ class _ProfilePage extends State<ProfilePage> {
                   Text(user.loginTel),
                   const SizedBox(height: 100),
                   Center(
-                  child: ElevatedButton.icon(
-                    onPressed: logout,
-                    icon: const Icon(Icons.logout),
-                    label: const Text('ออกจากระบบ'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(200, 50),
+                    child: ElevatedButton.icon(
+                      onPressed: logout,
+                      icon: const Icon(Icons.logout),
+                      label: const Text('ออกจากระบบ'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(200, 50),
+                      ),
                     ),
                   ),
-                ),
                 ],
               ),
             ),
@@ -114,12 +116,10 @@ class _ProfilePage extends State<ProfilePage> {
   }
 
   void logout() {
-    SharedPreferences.getInstance().then((prefs) {
-      Navigator.pop(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-
-    });
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 }

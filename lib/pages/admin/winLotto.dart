@@ -36,7 +36,7 @@ class _WinlottoState extends State<Winlotto> {
     'first': 'รางวัลที่ 1',
     'second': 'รางวัลที่ 2',
     'third': 'รางวัลที่ 3',
-    'lastTwoDigits': 'เลขท้าย 2 ตัว',
+    'fifth': 'เลขท้าย 2 ตัว',
     'lastThreeDigits': 'เลขท้าย 3 ตัว (จากรางวัลที่ 1)',
   };
 
@@ -44,7 +44,7 @@ class _WinlottoState extends State<Winlotto> {
     'first': '6,000,000 บาท',
     'second': '200,000 บาท',
     'third': '80,000 บาท',
-    'lastTwoDigits': '2,000 บาท',
+    'fifth': '2,000 บาท',
     'lastThreeDigits': '4,000 บาท',
   };
 

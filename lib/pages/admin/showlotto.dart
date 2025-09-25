@@ -1,9 +1,8 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:patinya888/config/internal_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:patinya888/config/internal_config.dart';
 
 class ShowLotto extends StatefulWidget {
   const ShowLotto({super.key});
@@ -20,10 +19,21 @@ class _ShowLottoState extends State<ShowLotto> {
 
   String selectedCategory = "all";
   bool isLoading = true;
+
+  // ✅ เพิ่มตัวแปร search
+  String searchQuery = "";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchLotto();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           "ล็อตเตอรี่ทั้งหมด",
           style: TextStyle(color: Colors.white),
@@ -36,44 +46,80 @@ class _ShowLottoState extends State<ShowLotto> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    fetchLotto();
+  // ✅ Widget สำหรับเลือกหมวดหมู่
+  Widget buildCategorySelector() {
+    final categories = {
+      "all": "🎟 ทั้งหมด",
+      "sold": "✅ ขายแล้ว",
+      "unsold": "🕳 ยังไม่ขาย",
+      "winner": "🏆 ถูกรางวัล",
+    };
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.entries.map((entry) {
+          final key = entry.key;
+          final label = entry.value;
+          final isSelected = selectedCategory == key;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  selectedCategory = key;
+                });
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: isSelected ? Colors.black : Colors.grey[300],
+                foregroundColor: isSelected ? Colors.white : Colors.black,
+              ),
+              child: Text(label),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
-  // Widget สำหรับแสดงรายการลอตเตอรี่
+  // ✅ Widget สำหรับแสดงลอตเตอรี่
   Widget buildLottoList(List<dynamic> list) {
+    // 🔎 กรองด้วย searchQuery
+    final filteredList = list.where((lotto) {
+      final number = lotto['number']?.toString() ?? '';
+      return number.contains(searchQuery);
+    }).toList();
+
+    if (filteredList.isEmpty) {
+      return const Center(child: Text("ไม่พบลอตเตอรี่ที่ค้นหา"));
+    }
+
     return Column(
-      children: list.map((lotto) {
-        final number = lotto['number'];
-        final isSold = lotto['isSold'];
-        final isWinner = lotto['isWinner'];
-        final claimed = lotto['claimed'];
+      children: filteredList.map((lotto) {
+        final number = lotto['number'] ?? 'ไม่ทราบ';
+        final isSold = lotto['isSold'] == true;
+        final isWinner = lotto['isWinner'] == true;
+        final claimed = lotto['claimed'] == true;
         final buyerId = lotto['buyerId'];
 
-        List<Widget> chipWidgets = [];
+        List<Widget> chipWidgets = [
+          Chip(
+            label: Text(isSold ? "ขายแล้ว" : "ยังไม่ขาย"),
+            backgroundColor: isSold ? Colors.green : Colors.grey,
+          ),
+        ];
 
-        if (isSold == true) {
-          chipWidgets.add(
-            const Chip(label: Text("ขายแล้ว"), backgroundColor: Colors.green),
-          );
-        } else {
-          chipWidgets.add(
-            const Chip(label: Text("ยังไม่ขาย"), backgroundColor: Colors.grey),
-          );
-        }
-
-        if (isWinner == true) {
+        if (isWinner) {
           chipWidgets.add(
             const Chip(label: Text("ถูกรางวัล"), backgroundColor: Colors.amber),
           );
         }
 
-        if (claimed == true) {
+        if (claimed) {
           chipWidgets.add(
             const Chip(
-              label: Text("เคลมแล้ว"),
+              label: Text("ขึ้นเงินแล้ว"),
               backgroundColor: Colors.blueAccent,
             ),
           );
@@ -105,6 +151,7 @@ class _ShowLottoState extends State<ShowLotto> {
     );
   }
 
+  // ✅ Content
   Widget buildContent() {
     List<dynamic> currentList;
 
@@ -126,6 +173,25 @@ class _ShowLottoState extends State<ShowLotto> {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
+          // 🔎 ช่องค้นหา
+          TextField(
+            decoration: InputDecoration(
+              hintText: "ค้นหาเลขลอตเตอรี่",
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                searchQuery = value.trim();
+              });
+            },
+          ),
+          const SizedBox(height: 12),
           buildCategorySelector(),
           const SizedBox(height: 12),
           buildLottoList(currentList),
@@ -134,59 +200,32 @@ class _ShowLottoState extends State<ShowLotto> {
     );
   }
 
-  // Widget สำหรับสร้างปุ่มเลือกหมวดหมู่
-  Widget buildCategorySelector() {
-    final categories = {
-      "all": "🎟 ทั้งหมด",
-      "sold": "✅ ขายแล้ว",
-      "unsold": "🕳 ยังไม่ขาย",
-      "winner": "🏆 ถูกรางวัล",
-    };
+  // ✅ ฟังก์ชันเช็คว่าถูกรางวัลมั้ย
+  bool checkWinner(String number, List winners) {
+    for (var w in winners) {
+      final type = w['type'];
+      final prizeNum = w['number'].toString();
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: categories.entries.map((entry) {
-          final key = entry.key;
-          final label = entry.value;
-          final isSelected = selectedCategory == key;
+      if (['first', 'second', 'third', 'fourth', 'fifth'].contains(type) &&
+          number == prizeNum)
+        return true;
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: TextButton(
-              onPressed: () {
-                setState(() {
-                  selectedCategory = key;
-                });
-              },
-              style: TextButton.styleFrom(
-                backgroundColor: isSelected ? Colors.black : Colors.grey[300],
-                foregroundColor: isSelected ? Colors.white : Colors.black,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-              child: Text(label),
-            ),
-          );
-        }).toList(),
-      ),
-    );
+      if (type == 'lastThreeDigits' && number.endsWith(prizeNum)) return true;
+      if (type == 'lastTwoDigits' && number.endsWith(prizeNum)) return true;
+    }
+    return false;
   }
-  // ฟังก์ชันสำหรับดึงข้อมูลลอตเตอรี่จาก API
 
+  // ✅ ดึงข้อมูลจาก API
   Future<void> fetchLotto() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
 
-      if (token == null) {
-        throw Exception("ยังไม่มี Token กรุณาเข้าสู่ระบบก่อน");
-      }
+      if (token == null) throw Exception("ยังไม่มี Token กรุณาเข้าสู่ระบบก่อน");
 
       final lottoRes = await http.get(
-        Uri.parse('$API_ENDPOINT/lotto'),
+        Uri.parse('$API_ENDPOINT/lottos'),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -198,12 +237,18 @@ class _ShowLottoState extends State<ShowLotto> {
       if (lottoRes.statusCode == 200 && winnerRes.statusCode == 200) {
         final List<dynamic> data = jsonDecode(lottoRes.body);
         final List<dynamic> winners = jsonDecode(winnerRes.body);
-        final winnerNumbers = winners.map((w) => w['number']).toSet();
 
         final updated = data.map((lotto) {
+          final number =
+              lotto['number']?.toString() ?? lotto['NUMBER']?.toString() ?? '';
+
           return {
             ...lotto,
-            'isWinner': winnerNumbers.contains(lotto['number']),
+            'number': number,
+            'isSold': lotto['isSold'] == 1 || lotto['isSold'] == true,
+            'claimed': lotto['claimed'] == 1 || lotto['claimed'] == true,
+            'buyerId': lotto['buyerId'],
+            'isWinner': checkWinner(number, winners),
           };
         }).toList();
 
@@ -218,9 +263,7 @@ class _ShowLottoState extends State<ShowLotto> {
         throw Exception("โหลดข้อมูลไม่สำเร็จ");
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("❌ เกิดข้อผิดพลาด: $e")));

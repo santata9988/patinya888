@@ -1,3 +1,5 @@
+// ✅ รวมหน้า HomePage และแสดงผลรางวัล lotto แบบแก้ไขแล้ว (รวมใน Card เดียว)
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -12,25 +14,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _ctrl = TextEditingController();
   bool isLoading = true;
   Map<String, dynamic> winners = {};
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text(
-          "ผลรางวัลลอตเตอรี่",
-          style: TextStyle(color: Colors.white)
-        ),
-        backgroundColor: Colors.black,
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : buildMainContent(),
-    );
-  }
 
   @override
   void initState() {
@@ -51,7 +37,6 @@ class _HomePageState extends State<HomePage> {
       if (res.statusCode == 200) {
         final List<dynamic> data = jsonDecode(res.body);
 
-        // 🔄 จัดกลุ่มข้อมูล
         final Map<String, dynamic> grouped = {
           "second": [],
           "third": [],
@@ -69,8 +54,8 @@ class _HomePageState extends State<HomePage> {
             case "third":
               grouped["third"].add(item["number"]);
               break;
-            case "lastTwoDigits":
-              grouped["lastTwo"] = item["number"];
+            case "fifth":
+              grouped["fifth"] = item["number"];
               break;
             case "lastThreeDigits":
               grouped["lastThree"].add(item["number"]);
@@ -93,115 +78,211 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 8),
-      child: Center(
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
+  void _checkNumber() async {
+    final number = _ctrl.text.trim();
+    if (number.isEmpty || int.tryParse(number) == null) {
+      _showDialog("⚠️ กรุณากรอกเลขให้ถูกต้อง");
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) {
+        _showDialog("❌ กรุณาเข้าสู่ระบบก่อน");
+        return;
+      }
+
+      final res = await http.get(
+        Uri.parse('$API_ENDPOINT/results'),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+
+        bool isWin = false;
+        String prizeType = "";
+
+        if (data is List) {
+          for (final item in data) {
+            final winNum = item["number"].toString();
+            final type = item["type"].toString();
+
+            if (number == winNum ||
+                (type == "lastTwoDigits" && number.endsWith(winNum)) ||
+                (type == "lastThreeDigits" && number.endsWith(winNum))) {
+              isWin = true;
+              prizeType = type;
+              break;
+            }
+          }
+        }
+
+        if (isWin) {
+          _showDialog("🎉 ยินดีด้วย! เลข $number ถูกรางวัล [$prizeType]");
+        } else {
+          _showDialog("❌ เลข $number ไม่ถูกรางวัล");
+        }
+      } else {
+        _showDialog("โหลดผลรางวัลไม่สำเร็จ [\${res.statusCode}]");
+      }
+    } catch (e) {
+      _showDialog("❌ เกิดข้อผิดพลาด: $e");
+    }
   }
 
-  Widget showmoney(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 8),
-      child: Center(
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget buildNumberGrid(List<dynamic> numbers, {Color color = Colors.red}) {
-    return Wrap(
-      spacing: 20,
-      runSpacing: 10,
-      alignment: WrapAlignment.center,
-      children: numbers
-          .map(
-            (num) => Text(
-              num.toString(),
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget buildMainContent() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // รางวัลที่ 1
-        Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+  void _showDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.black,
+        title: const Text("ผลการตรวจสอบ", style: TextStyle(color: Colors.cyan)),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("ปิด", style: TextStyle(color: Colors.white)),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: const Text(
+          "ตรวจผลลอตเตอรี่",
+          style: TextStyle(color: Colors.cyan),
+        ),
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                const Text("รางวัลที่ 1", style: TextStyle(fontSize: 28)),
-                Text(
-                  winners['first'] ?? "-",
-                  style: const TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
+                TextField(
+                  controller: _ctrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    counterText: "",
+                    hintText: "กรอกเลขลอตเตอรี่",
+                    hintStyle: const TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.grey[850],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text("รางวัลละ 6,000,000 บาท"),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _checkNumber,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan),
+                  child: const Text(
+                    "ตรวจรางวัล",
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+                const Divider(height: 32),
+
+                // ✅ รวมรางวัลทั้งหมดใน Card เดียว
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 16),
+
+                        if (winners['first'] != null) ...[
+                          const Text(
+                            "รางวัลที่ 1 (6,000,000 บาท)",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            winners['first'],
+                            style: const TextStyle(
+                              fontSize: 40,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if ((winners['second'] ?? []).isNotEmpty) ...[
+                          const Text("รางวัลที่ 2 (200,000 บาท)"),
+                          Wrap(
+                            spacing: 10,
+                            children: (winners['second'] as List)
+                                .map<Widget>(
+                                  (e) => Text(
+                                    e,
+                                    style: const TextStyle(fontSize: 35),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if ((winners['third'] ?? []).isNotEmpty) ...[
+                          const Text("รางวัลที่ 3 (80,000 บาท)"),
+                          Wrap(
+                            spacing: 10,
+                            children: (winners['third'] as List)
+                                .map<Widget>(
+                                  (e) => Text(
+                                    e,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if ((winners['lastThree'] ?? []).isNotEmpty) ...[
+                          const Text("เลขท้าย 3 ตัว (4,000 บาท)"),
+                          Wrap(
+                            spacing: 10,
+                            children: (winners['lastThree'] as List)
+                                .map<Widget>(
+                                  (e) => Text(
+                                    e,
+                                    style: const TextStyle(fontSize: 25),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if (winners['fifth'] != null) ...[
+                          const Text("เลขท้าย 2 ตัว (2,000 บาท)"),
+                          Text(
+                            winners['fifth'],
+                            style: const TextStyle(fontSize: 25),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // รางวัลที่ 2
-        buildSectionTitle("รางวัลที่ 2 "),
-        buildNumberGrid((winners['second'] ?? []) as List<dynamic>),
-        showmoney("รางวัล 200,000 บาท"),
-
-        // รางวัลที่ 3
-        buildSectionTitle("รางวัลที่ 3 "),
-        buildNumberGrid((winners['third'] ?? []) as List<dynamic>),
-        showmoney("80,000 บาท"),
-
-        const Divider(height: 32),
-
-        // เลขท้าย 3 ตัว
-        buildSectionTitle("เลขท้าย 3 ตัว"),
-        buildNumberGrid((winners['lastThree'] ?? []) as List<dynamic>),
-        showmoney("4,000 บาท"),
-
-        const SizedBox(height: 24),
-
-        // เลขท้าย 2 ตัว
-        buildSectionTitle("เลขท้าย 2 ตัว "),
-        showmoney("2,000 บาท"),
-        Text(
-          winners['lastTwo'] ?? "-",
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
     );
   }
 }

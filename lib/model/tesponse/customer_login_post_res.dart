@@ -4,18 +4,17 @@
 
 import 'dart:convert';
 
-CustomerLoginPostResponse customerLoginPostResponseFromJson(String str) => CustomerLoginPostResponse.fromJson(json.decode(str));
+CustomerLoginPostResponse customerLoginPostResponseFromJson(String str) =>
+    CustomerLoginPostResponse.fromJson(json.decode(str));
 
-String customerLoginPostResponseToJson(CustomerLoginPostResponse data) => json.encode(data.toJson());
+String customerLoginPostResponseToJson(CustomerLoginPostResponse data) =>
+    json.encode(data.toJson());
 
 class CustomerLoginPostResponse {
   String token;
   User user;
 
-  CustomerLoginPostResponse({
-    required this.token,
-    required this.user,
-  });
+  CustomerLoginPostResponse({required this.token, required this.user});
 
   factory CustomerLoginPostResponse.fromJson(Map<String, dynamic> json) =>
       CustomerLoginPostResponse(
@@ -23,10 +22,7 @@ class CustomerLoginPostResponse {
         user: User.fromJson(json["user"]),
       );
 
-  Map<String, dynamic> toJson() => {
-        "token": token,
-        "user": user.toJson(),
-      };
+  Map<String, dynamic> toJson() => {"token": token, "user": user.toJson()};
 }
 
 class User {
@@ -47,20 +43,20 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-        id: json["id"],
-        name: json["name"],
-        loginTel: json["login_tel"],
-        password: json["password"],
-        role: json["role"],
-        wallet: json["wallet"],
-      );
+    id: int.tryParse(json["id"].toString()) ?? 0,
+    name: json["name"] ?? json["NAME"] ?? "", // 🔒 แก้จุดที่ทำให้ error
+    loginTel: json["login_tel"] ?? "",
+    password: json["password"] ?? "",
+    role: json["role"] ?? "",
+    wallet: int.tryParse(json["wallet"].toString()) ?? 0,
+  );
 
   Map<String, dynamic> toJson() => {
-        "id": id,
-        "name": name,
-        "login_tel": loginTel,
-        "password": password,
-        "role": role,
-        "wallet": wallet,
-      };
+    "id": id,
+    "name": name,
+    "login_tel": loginTel,
+    "password": password,
+    "role": role,
+    "wallet": wallet,
+  };
 }

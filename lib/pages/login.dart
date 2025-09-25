@@ -172,12 +172,21 @@ class _LoginPageState extends State<LoginPage> {
         );
         return;
       }
+      // หลังจาก login API success
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("token", data["token"]);
+      await prefs.setInt("userId", data["user"]["id"]); // เก็บ id
 
       handleLoginSuccess(data["token"]);
+      if (data["token"] == null || data["user"] == null) {
+        log("❌ response missing token or user");
+        setState(() => text = "ข้อมูล login ไม่สมบูรณ์");
+        return;
+      }
 
       CustomerLoginPostResponse customerLoginPostResponse =
           CustomerLoginPostResponse.fromJson(data);
-
+      log('📦 login response: ${response.body}');
       if (customerLoginPostResponse.user.role == "owner") {
         Navigator.push(
           context,
